@@ -33,3 +33,5 @@
 
 submodules/build
 build
+data
+.vs
