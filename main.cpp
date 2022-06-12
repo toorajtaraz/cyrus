@@ -9,6 +9,7 @@ using namespace std;
 #include <opencv2/cudaarithm.hpp>
 using namespace cv::cuda;
 
+#include <cuda.h>
 int main()
 {
     printShortCudaDeviceInfo(getDevice());
