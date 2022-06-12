@@ -1,7 +1,7 @@
 #include <helpers.h>
 
 #include <thrust/device_vector.h>
-DEVICE_CALLABLE int *extract_histogram(cv::cuda::GpuMat &img, int *count, int x_start, int x_end, int y_start, int y_end, int *histt, int sw) {
+__device__ int *extract_histogram(cv::cuda::GpuMat &img, int *count, int x_start, int x_end, int y_start, int y_end, int *histt, int sw) {
     if (histt == NULL)
     {
         histt = new int[PIXEL_RANGE]();
@@ -36,13 +36,9 @@ DEVICE_CALLABLE int *extract_histogram(cv::cuda::GpuMat &img, int *count, int x_
     }
     return histt;
 }
-DEVICE_CALLABLE int *extract_histogram_rgb(cv::cuda::GpuMat &img, int *count, int x_start, int x_end, int y_start, int y_end, short channel, int *histt, int sw) {
-    if (histt == NULL)
-    {
-        histt = new int[PIXEL_RANGE]();
-    }
-    else if (x_start < 0 || x_end > img.rows || y_start < 0 || y_end > img.cols)
-        return NULL;
+__device__ void extract_histogram_rgb(cv::cuda::GpuMat &img, int *count, int x_start, int x_end, int y_start, int y_end, short channel, int *histt, int sw) {
+    if (x_start < 0 || x_end > img.rows || y_start < 0 || y_end > img.cols)
+        return;
 
     int height = img.rows;
     int width = img.cols;
@@ -54,16 +50,20 @@ DEVICE_CALLABLE int *extract_histogram_rgb(cv::cuda::GpuMat &img, int *count, in
         y_start = 0;
     if (y_end > width)
         y_end = width;
+    
 
     for (auto i = x_start; i < x_end; i++)
         for (auto j = y_start; j < y_end; j++)
         {
-            // *count += sw;
+            // int temp = *count;
+            *count = 1;
+            // *count += 1;
             // histt[img.data[i * width + j * RGB_CHANNELS + channel]] += sw;
+            //             histt[img.data[i * width + j * RGB_CHANNELS + channel]] += sw;
         }
-    return histt;    
+    return;    
 }
-DEVICE_CALLABLE double *calculate_probability(int *hist, int total_pixels) {
+__device__ double *calculate_probability(int *hist, int total_pixels) {
     double *prob = new double[PIXEL_RANGE]();
     for (auto i = 0; i < PIXEL_RANGE; i++)
     {
@@ -71,7 +71,7 @@ DEVICE_CALLABLE double *calculate_probability(int *hist, int total_pixels) {
     }
     return prob;
 }
-DEVICE_CALLABLE double *buildLook_up_table(double *prob) {
+__device__ double *buildLook_up_table(double *prob) {
     double *lut = new double[PIXEL_RANGE]();
 
     for (auto i = 0; i < PIXEL_RANGE; i++)
@@ -83,7 +83,7 @@ DEVICE_CALLABLE double *buildLook_up_table(double *prob) {
     }
     return lut;
 }
-DEVICE_CALLABLE double *buildLook_up_table_rgb(int *hist_blue, int *hist_green, int *hist_red, int count, bool free_sw) {
+__device__ double *buildLook_up_table_rgb(int *hist_blue, int *hist_green, int *hist_red, int count, bool free_sw) {
     double *prob_blue = calculate_probability(hist_blue, count);
     double *lut_blue = buildLook_up_table(prob_blue);
     delete[] prob_blue;
@@ -110,7 +110,28 @@ DEVICE_CALLABLE double *buildLook_up_table_rgb(int *hist_blue, int *hist_green, 
     }
     return lut_final;    
 }
-GLOBAL_CALLABLE void test_histogram(cv::cuda::GpuMat &img, int *count, int x_start, int x_end, int y_start, int y_end, short channel, int *histt, int sw) {
+__global__ void test_histogram(cv::cuda::GpuMat &img, int *count, int x_start, int x_end, int y_start, int y_end, short channel, int *histt, int sw) {
     //call extract histogram rgb
-    extract_histogram_rgb(img, count, x_start, x_end, y_start, y_end, channel, histt, sw);
+    if (x_start < 0 || x_end > img.rows || y_start < 0 || y_end > img.cols)
+        return;
+
+    int height = img.rows;
+    int width = img.cols;
+    if (x_start < 0)
+        x_start = 0;
+    if (x_end > height)
+        x_end = height;
+    if (y_start < 0)
+        y_start = 0;
+    if (y_end > width)
+        y_end = width;
+    
+
+    for (auto i = x_start; i < x_end; i++)
+        for (auto j = y_start; j < y_end; j++)
+        {
+            count[0] += 1;
+            // histt[img.data[i * width + j * RGB_CHANNELS + channel]] += sw;
+            //             histt[img.data[i * width + j * RGB_CHANNELS + channel]] += sw;
+        }
 }

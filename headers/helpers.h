@@ -21,11 +21,11 @@
 #include <cuda.h>
 
 //device function that extracts histogram of an image on gpu
-DEVICE_CALLABLE int *extract_histogram_rgb(cv::cuda::GpuMat &img, int *count, int x_start, int x_end, int y_start, int y_end, short channel, int *histt = NULL, int sw = 1);
-DEVICE_CALLABLE int *extract_histogram(cv::cuda::GpuMat &img, int *count, int x_start, int x_end, int y_start, int y_end, int *histt = NULL, int sw = 1);
-DEVICE_CALLABLE double *calculate_probability(int *hist, int total_pixels);
-DEVICE_CALLABLE double *buildLook_up_table(double *prob);
-DEVICE_CALLABLE double *buildLook_up_table_rgb(int *hist_blue, int *hist_green, int *hist_red, int count, bool free_sw = true);
-GLOBAL_CALLABLE void test_histogram(cv::cuda::GpuMat &img, int *count, int x_start, int x_end, int y_start, int y_end, short channel, int *histt = NULL, int sw = 1);
+__device__ void extract_histogram_rgb(cv::cuda::GpuMat &img, int *count, int x_start, int x_end, int y_start, int y_end, short channel, int *histt = NULL, int sw = 1);
+__device__ int *extract_histogram(cv::cuda::GpuMat &img, int *count, int x_start, int x_end, int y_start, int y_end, int *histt = NULL, int sw = 1);
+__device__ double *calculate_probability(int *hist, int total_pixels);
+__device__ double *buildLook_up_table(double *prob);
+__device__ double *buildLook_up_table_rgb(int *hist_blue, int *hist_green, int *hist_red, int count, bool free_sw = true);
+__global__ void test_histogram(cv::cuda::GpuMat &img, int *count, int x_start, int x_end, int y_start, int y_end, short channel, int *histt = NULL, int sw = 1);
 //end def gaurds
 #endif // HELPERS_HPP
