@@ -1,0 +1,1 @@
+Set-Location build && cmake .. && cmake --build .  --config Release && .\bin\Release\cyrus.exe && Set-Location ..
