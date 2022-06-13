@@ -1,17 +1,19 @@
 #include <helpers.h>
 
-#include <thrust/device_vector.h>
 __device__ void extract_histogram(const uchar *img, int width, int height, int *count, int x_start, int x_end, int y_start, int y_end, int steps, int *histt, int sw)
 {
     extern __shared__ int sh_histt[];
 
-    if (threadIdx.x == 0)
+    int index = threadIdx.y * blockDim.y + threadIdx.x;
+
+    if (index == 0)
     {
         sh_histt[256] = 0;
     }
 
-    if (threadIdx.x < 256) {
-        sh_histt[threadIdx.x] = 0;
+    if (index < 256)
+    {
+        sh_histt[index] = 0;
     }
 
     __syncthreads();
@@ -24,21 +26,21 @@ __device__ void extract_histogram(const uchar *img, int width, int height, int *
     }
 
     __syncthreads();
-    if (threadIdx.x == 0)
+    if (index == 0)
     {
-        count[0] = sh_histt[256];
+        atomicAdd(&count[0], sh_histt[256]);
     }
 
-    if (threadIdx.x < 256)
+    if (index < 256)
     {
-        atomicAdd(&histt[threadIdx.x], sh_histt[threadIdx.x]);
+        atomicAdd(&histt[index], sh_histt[index]);
     }
 }
 __device__ void extract_histogram_rgb(const uchar *img, int width, int height, int *count, int x_start, int x_end, int y_start, int y_end, int steps, short channel, short channels_c, int *histt, int sw)
 {
     extern __shared__ int sh_histt[];
 
-    //calculate global id 
+    // calculate global id
     int index = threadIdx.y * blockDim.y + threadIdx.x;
 
     if (index == 0)
@@ -46,12 +48,13 @@ __device__ void extract_histogram_rgb(const uchar *img, int width, int height, i
         sh_histt[256] = 0;
     }
 
-    if (index < 256) {
+    if (index < 256)
+    {
         sh_histt[index] = 0;
     }
 
     __syncthreads();
-    //do if boundary is valid
+    // do if boundary is valid
     for (auto i = x_start; i < x_end && i < height; i++)
         for (auto j = y_start; j < y_end && j < width; j++)
         {
@@ -72,11 +75,20 @@ __device__ void extract_histogram_rgb(const uchar *img, int width, int height, i
 }
 __device__ double *calculate_probability(int *hist, int total_pixels)
 {
-    double *prob = new double[PIXEL_RANGE]();
-    for (auto i = 0; i < PIXEL_RANGE; i++)
-    {
-        prob[i] = (double)hist[i] / total_pixels;
-    }
+    double *prob = new double[PIXEL_RANGE]{0.0};
+
+    // // calculate global id
+    // int index = threadIdx.y * blockDim.y + threadIdx.x;
+
+    // if (index < 256)
+    // {
+    //     prob[i] = (double)hist[i] / total_pixels;
+    // }
+
+    // for (auto i = 0; i < PIXEL_RANGE; i++)
+    // {
+    //     prob[i] = (double)hist[i] / total_pixels;
+    // }
     return prob;
 }
 __device__ double *buildLook_up_table(double *prob)
@@ -127,29 +139,4 @@ __global__ void test_histogram(const uchar *img, int width, int height, int *cou
     int y = blockIdx.y * blockDim.y + threadIdx.y;
 
     extract_histogram_rgb(img, width, height, count, x, x + 1, y, y + 1, steps, channel, channels_c, histt, sw);
-    // //calculate range for each block
-    // int x_range = (x_end - x_start + 1) / block_size;
-    // int y_range = (y_end - y_start + 1) / block_size;
-
-    // //calculate range for each thread
-    // int x_thread_range = (x_range + 1) / block_threads;
-    // int y_thread_range = (y_range + 1) / block_threads;
-
-    // //get block id
-    // int block_id_x = blockIdx.x * blockDim.x;
-    // int block_id_y = blockIdx.y * blockDim.y;
-
-    // //get thread id
-    // int thread_id = threadIdx.x;
-
-    // int this_thread_x_start =  x_start + block_id_x * x_range + thread_id * x_thread_range;
-    // int this_thread_y_start = y_start + block_id_y * y_range + thread_id * y_thread_range;
-
-    // int this_thread_x_end = this_thread_x_start + x_thread_range;
-    // int this_thread_y_end = this_thread_y_start + y_thread_range;
-
-    // //print ids
-    // printf("block_id_X: %d, block_id_Y: %d, thread_id: %d\n", block_id_x, block_id_y, thread_id);
-    // printf("x_start : %d, x_end : %d, y_start : %d, y_end : %d\n", this_thread_x_start, this_thread_x_end, this_thread_y_start, this_thread_y_end);
-    // extract_histogram_rgb(img, width, height, count, this_thread_x_start, this_thread_x_end, this_thread_y_start, this_thread_y_end, steps, channel, channels_c, histt, sw);
 }

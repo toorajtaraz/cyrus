@@ -88,7 +88,7 @@ int main()
     dim3 dimGrid((d_src.cols - 1) / 32 + 1, (d_src.rows - 1) / 32 + 1, 1);
     int block_count = ((d_src.cols - 1) / 32 + 1) * ((d_src.rows - 1) / 32 + 1);
     auto start_gpu = std::chrono::high_resolution_clock::now();
-    test_histogram<<<dimGrid, dimBlock, 257*sizeof(int)>>>(d_src.data, d_src.rows, d_src.cols, d_count, 0, d_src.cols, 0, d_src.rows, d_src.step, block_count, 1024, 0, d_src.channels(), d_hist);
+    test_histogram<<<dimGrid, dimBlock, (257 * sizeof(int)) + (256 * sizeof(double)) >>>(d_src.data, d_src.rows, d_src.cols, d_count, 0, d_src.cols, 0, d_src.rows, d_src.step, block_count, 1024, 0, d_src.channels(), d_hist);
     // wait for gpu to finish
     cudaDeviceSynchronize();
     auto end_gpu = std::chrono::high_resolution_clock::now();
