@@ -5,150 +5,122 @@ using namespace std;
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
-
 #include <opencv2/cudaarithm.hpp>
 using namespace cv::cuda;
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+// include headers for cudamallocmanaged
+#include <cuda_runtime_api.h>
 
 #include <helpers.h>
-
-//add two int arrays into one array on gpu
-__device__
-void add_int_arrays(int *d_arr1, int *d_arr2, int *d_arr3, int size)
-{
-    for (int i = 0; i < size; i++)
-    {
-        d_arr3[i] = d_arr1[i] + d_arr2[i];
-    }
-}
-
-//kernel for addition
-__global__
-void add_int_arrays_kernel(int *d_arr1, int *d_arr2, int *d_arr3, int size)
-{
-    add_int_arrays(d_arr1, d_arr2, d_arr3, size);
-}
-
 int main()
 {
-    // //create two arrays on host
-    int size = 10;
-    int *h_arr1 = new int[size];
-    int *h_arr2 = new int[size];
-    int *h_arr3 = new int[size];
-
-    //fill arrays with random values
-    for (int i = 0; i < size; i++)
+    // Load image
+    cv::Mat src = cv::imread("E:\\university\\Projects\\cyrus\\data\\1.jpg");
+    //print image shape
+    cout << "src shape" << src.size() << " " << src.channels() << endl;
+    int *hist = new int[256]{0};
+    //measure how long does it take to calculate histogram on cpu
+    auto start = std::chrono::high_resolution_clock::now();
+    //compute histogram on cpu
+    for (int i = 0; i < src.rows; i++)
     {
-        h_arr1[i] = rand() % 10;
-        h_arr2[i] = rand() % 10;
-        cout << "arr 1 = " << h_arr1[i] << endl;
-        cout << "arr 2 = " << h_arr2[i] << endl;
+        for (int j = 0; j < src.cols; j++)
+        {
+            int pix = src.at<cv::Vec3b>(i, j)[0];
+            hist[pix]++;
+        }
     }
-
-    //create two arrays on gpu
-    int *d_arr1;
-    int *d_arr2;
-    int *d_arr3;
-    cudaMalloc(&d_arr1, size * sizeof(int));
-    cudaMalloc(&d_arr2, size * sizeof(int));
-
-    //copy arrays to gpu
-    cudaMemcpy(d_arr1, h_arr1, size * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_arr2, h_arr2, size * sizeof(int), cudaMemcpyHostToDevice);
-
-    //create array on gpu for result
-    cudaMalloc(&d_arr3, size * sizeof(int));
-
-    //call kernel
-    add_int_arrays_kernel<<<1, 1>>>(d_arr1, d_arr2, d_arr3, size);
-
-    //copy result from gpu to host
-    cudaMemcpy(h_arr3, d_arr3, size * sizeof(int), cudaMemcpyDeviceToHost);
-
-    //print result
-    for (int i = 0; i < size; i++)
+    auto end = std::chrono::high_resolution_clock::now();
+    //print histogram
+    for (int i = 0; i < 256; i++)
     {
-        cout << h_arr3[i] << " ";
+        cout << i << " " << hist[i] << endl;
     }
+    // Upload image to GPU
+    cv::cuda::GpuMat d_src;
+    d_src.upload(src);
 
-    printShortCudaDeviceInfo(getDevice());
-    int cuda_devices_number = getCudaEnabledDeviceCount();
-    cout << "CUDA Device(s) Number: "<< cuda_devices_number << endl;
-    DeviceInfo _deviceInfo;
-    bool _isd_evice_compatible = _deviceInfo.isCompatible();
-    cout << "CUDA Device(s) Compatible: " << _isd_evice_compatible << endl;
-    cout << "Hello, World!" << endl;
-    //open 1.jpg and upload it to gpu then download it and show it
-    cv::Mat _src_img = cv::imread("E:\\university\\Projects\\cyrus\\data\\1.jpg");
-    cv::Mat _dst_img;
-    cv::cuda::GpuMat _src_gpu_img;
-    _src_gpu_img.upload(_src_img);
-    cout << "gpumat image shape : " << _src_gpu_img.channels() << " " << _src_gpu_img.rows << " " << _src_gpu_img.cols << endl;
+    // Create histogram array for cpu and gpu
+    int histSize = 256;
+    int *h_hist = new int[histSize]{0};
     int *d_hist;
-    int *h_hist = new int[256]{0};
-    int _hist_size = 256;
-    //allocate memory for histogram on gpu
+
+    // allocate memory for histogram on gpu and set it to 0
     cudaError_t err;
-    err = cudaMalloc((void **) &d_hist, _hist_size * sizeof(int));
+
+    err = cudaMalloc((void **)&d_hist, histSize * sizeof(int));
     if (err != cudaSuccess)
     {
-        cout << "Error allocating device memory!" << endl;
+        printf("Error allocating device memory!\n");
         return -1;
     }
-    err = cudaMemset(d_hist, 0, _hist_size * sizeof(int));
+
+    err = cudaMemset(d_hist, 0, histSize * sizeof(int));
     if (err != cudaSuccess)
     {
-        cout << "Error setting device memory!" << endl;
+        printf("Error setting device memory!\n");
         return -1;
     }
-    //allocate memory for histogram on cpu
-    int *d_count;
+
+    // Create count pointer on cpu and gpu
     int *h_count = new int[1]{0};
-    //allocate memory for count on gpu
-    err = cudaMalloc((void **) &d_count, sizeof(int));
+    int *d_count;
+
+    // allocate memory for count on gpu and set it to 0
+    err = cudaMalloc((void **)&d_count, sizeof(int));
     if (err != cudaSuccess)
     {
-        cout << "Error allocating device memory!" << endl;
+        printf("Error allocating device memory!\n");
         return -1;
     }
+
     err = cudaMemset(d_count, 0, sizeof(int));
     if (err != cudaSuccess)
     {
-        cout << "Error setting device memory!" << endl;
+        printf("Error setting device memory!\n");
         return -1;
     }
-    for (int i = 0; i < _hist_size; i++)
-    {
-        cout << h_hist[i] << " ";
-    }
-    
-    cout << "count is " << h_count[0] << endl;
-    //allocate memory for count on cpu
-    //calculate histogram on gpu
-    test_histogram<<<1,1>>>(_src_gpu_img, d_count, 0, 0, 0, 0, 0, d_hist, 1);
-    cudaDeviceSynchronize();
-    //copy count from gpu to cpu
-    cudaMemcpy(h_count, d_count, sizeof(int), cudaMemcpyDeviceToHost);
-    //copy hist from gpu to cpu
-    cudaError_t errr =  cudaMemcpy(h_hist, d_hist, _hist_size * sizeof(int) - 1, cudaMemcpyDeviceToHost);
-    if (errr != cudaSuccess)
-    {
-        cout << "Error copying device memory!" << cudaGetErrorString(errr) << __FILE__ <<
-__LINE__ << endl;
-        return -1;
-    }
-    //print histogram on cpu
-    for (int i = 0; i < _hist_size; i++)
-    {
-        cout << h_hist[i] << " ";
-    }
-    
-    cout << "count is " << h_count[0] << endl;
 
-    cv::imshow("src_img", _src_img);
-    cv::waitKey(0);
+    // Launch the kernel with 1 block and 1 thread
+    dim3 dimBlock(32, 32, 1);
+    dim3 dimGrid((d_src.cols - 1) / 32 + 1, (d_src.rows - 1) / 32 + 1, 1);
+    int block_count = ((d_src.cols - 1) / 32 + 1) * ((d_src.rows - 1) / 32 + 1);
+    auto start_gpu = std::chrono::high_resolution_clock::now();
+    test_histogram<<<dimGrid, dimBlock, 257*sizeof(int)>>>(d_src.data, d_src.rows, d_src.cols, d_count, 0, d_src.cols, 0, d_src.rows, d_src.step, block_count, 1024, 0, d_src.channels(), d_hist);
+    // wait for gpu to finish
+    cudaDeviceSynchronize();
+    auto end_gpu = std::chrono::high_resolution_clock::now();
+    // Download the histogram from the GPU
+    err = cudaMemcpy(h_hist, d_hist, histSize * sizeof(int), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess)
+    {
+        printf("Error copying device memory to host!\n");
+        return -1;
+    }
+
+    // Download the count from the GPU
+    err = cudaMemcpy(h_count, d_count, sizeof(int), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess)
+    {
+        printf("Error copying device memory to host!\n");
+        return -1;
+    }
+
+    // Print the histogram
+    for (int i = 0; i < histSize; i++)
+    {
+        cout << h_hist[i] << " ";
+    }
+
+    // Print the count
+    cout << endl
+         << h_count[0] << endl;
+
+
+    //print time taken on cpu and gpu
+    cout << "time taken on cpu: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms" << endl;
+    cout << "time taken on gpu: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu - start_gpu).count() << " ms" << endl;
     return 0;
 }
