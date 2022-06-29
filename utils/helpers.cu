@@ -579,3 +579,39 @@ __global__ void buildLook_up_table(double *prob, double *lut)
 {
     helper_buildLook_up_table(prob, lut);
 }
+
+
+
+__global__ void lhe_build_luts(double ***all_luts, const uchar *img, int offset, int i_start, int i_end, int j_start, int j_end, int width, int height, int channel_c, int steps) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    int offseted_x = x * offset;
+    int offseted_y = y * offset;
+    int total_area = 4 * offset * offset;
+    dim3 block(32, 32, 1);
+    dim3 grid((2 * offset - 1) / 32 + 1, (2 * offset - 1) / 32 + 1, 1);
+    all_luts[x][y] = new double [PIXEL_RANGE]();
+    int **hists = new int *[channel_c];
+    int *count = new int[1];
+    for (auto i = 0; i < channel_c; i++)
+    {
+        *count = 0;
+        hists[i] = new int[PIXEL_RANGE]();
+        extract_histogram_rgb<<<grid, block>>>(img, count, offseted_x - offset, offseted_x + offset, offseted_y - offset, offseted_y + offset, width, height, steps, i, channel_c, hists[i], 1);
+    }
+    double *lut_blue, *lut_green, *lut_red;
+    lut_blue = new double[PIXEL_RANGE]();
+    lut_green = new double[PIXEL_RANGE]();
+    lut_red = new double[PIXEL_RANGE]();
+    buildLook_up_table_rgb<<<1, 256>>>(hists[2], hists[1], hists[0], *count, true, all_luts[x][y], lut_blue, lut_green, lut_red);
+
+    for (auto i = 0; i < channel_c; i++)
+    {
+        delete[] hists[i];
+    }
+    delete[] hists;
+    delete[] count;
+    delete[] lut_blue;
+    delete[] lut_green;
+    delete[] lut_red;
+}
