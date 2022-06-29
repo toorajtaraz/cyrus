@@ -31,7 +31,10 @@ link_directories( ${CMAKE_BINARY_DIR}/bin)
 
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin)
 
-add_executable( cyrus ${NAME_SRC} ${NAME_HEADERS} )
-# set_property(TARGET cyrus PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+#enable dynamic parallelism for cuda
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} "-rdc=true" )
 
-target_link_libraries( cyrus PRIVATE  ${OpenCV_LIBS} ${CUDA_LIBRARIES} )
+add_executable( cyrus ${NAME_SRC} ${NAME_HEADERS} )
+set_property(TARGET cyrus PROPERTY CUDA_SEPARABLE_COMPILATION ON)
+
+target_link_libraries( cyrus PRIVATE   -lcudadevrt -lcublas_device  ${OpenCV_LIBS} ${CUDA_LIBRARIES} ${CUDA_NVCC_FLAGS})
