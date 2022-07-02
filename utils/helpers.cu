@@ -588,22 +588,40 @@ __global__ void lhe_build_luts(double ***all_luts, const uchar *img, int offset,
     int offseted_x = x * offset;
     int offseted_y = y * offset;
     int total_area = 4 * offset * offset;
+    int i_start_t, i_end_t, j_start_t, j_end_t;
     dim3 block(32, 32, 1);
     dim3 grid((2 * offset - 1) / 32 + 1, (2 * offset - 1) / 32 + 1, 1);
-    all_luts[x][y] = new double [PIXEL_RANGE]();
     int **hists = new int *[channel_c];
     int *count = new int[1];
+    if (offseted_x - offset < 0) {
+        i_start_t = 0;
+    }
+    if (offseted_x + offset > height) {
+        i_end_t = height;
+    }
+    if (offseted_y - offset < 0) {
+        j_start_t = 0;
+    }
+    if (offseted_y + offset > width) {
+        j_end_t = width;
+    }
     for (auto i = 0; i < channel_c; i++)
     {
         *count = 0;
         hists[i] = new int[PIXEL_RANGE]();
-        extract_histogram_rgb<<<grid, block>>>(img, count, offseted_x - offset, offseted_x + offset, offseted_y - offset, offseted_y + offset, width, height, steps, i, channel_c, hists[i], 1);
+        //print x and y
+        // printf("x %d y %d before\n", x, y);
+        extract_histogram_rgb<<<grid, block>>>(img, count, i_start_t, i_end_t, j_start_t, j_end_t, width, height, steps, i, channel_c, hists[i], 1);
+        // printf("x %d y %d after\n", x, y);
+
     }
+
     double *lut_blue, *lut_green, *lut_red;
     lut_blue = new double[PIXEL_RANGE]();
     lut_green = new double[PIXEL_RANGE]();
     lut_red = new double[PIXEL_RANGE]();
     buildLook_up_table_rgb<<<1, 256>>>(hists[2], hists[1], hists[0], *count, true, all_luts[x][y], lut_blue, lut_green, lut_red);
+    printf("got here\n");
 
     for (auto i = 0; i < channel_c; i++)
     {

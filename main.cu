@@ -247,6 +247,49 @@ int main()
         printf("Error allocating device memory!\n");
         return -1;
     }
+
+    // Dynamic programming for histogram
+    //offset is floor of half of window size
+    // window size is one of these:
+    // 151
+    // 51
+    // dynamic programming array of luts must be (width/offset) x (height/offset)
+    int window = 151;
+    int offset = (int) floor((double) window / 2.0);
+    int width = src.rows;
+    int height = src.cols;
+    int max_i = height + (offset - (height % offset));
+    int max_j = width + (offset - (width % offset));
+
+    // dim3 dimBlock(32, 32, 1);
+    // dim3 dimGrid((max_i / offset), (max_j / offset), 1);
+
+
+    // double ***d_dp_luts;
+    // err = cudaMallocManaged((void **)&d_dp_luts, sizeof(double **) * (max_i / offset));
+    // if (err != cudaSuccess)
+    // {
+    //     printf("Error allocating device memory!\n");
+    //     return -1;
+    // }
+    // for (int i = 0; i < (max_i / offset); i++)
+    // {
+    //     err = cudaMallocManaged((void **)&(d_dp_luts[i]), sizeof(double *) * (max_j / offset));
+    //     if (err != cudaSuccess)
+    //     {
+    //         printf("Error allocating device memory!\n");
+    //         return -1;
+    //     }
+    //     for (int j = 0; j < (max_j / offset); j++)
+    //     {
+    //         err = cudaMallocManaged((void **)&(d_dp_luts[i][j]), sizeof(double) * 256);
+    //         if (err != cudaSuccess)
+    //         {
+    //             printf("Error allocating device memory!\n");
+    //             return -1;
+    //         }
+    //     }
+    // }
     // // Launch the kernel with 1 block and 1 thread
     dim3 dimBlock(32, 32, 1);
     dim3 dimGrid((d_src.cols - 1) / 32 + 1, (d_src.rows - 1) / 32 + 1, 1);
@@ -255,22 +298,23 @@ int main()
     // dim3 dimGrid(2, 2, 1);
     int block_count = ((d_src.cols - 1) / 32 + 1) * ((d_src.rows - 1) / 32 + 1);
     auto start_gpu = std::chrono::high_resolution_clock::now();
-    // extract_histogram_rgb<<<dimGrid, dimBlock, (257 * sizeof(int)) + (256 * sizeof(double))>>>(d_src.data, d_count_red, 0, d_src.cols, 0, d_src.rows, d_src.rows, d_src.cols, d_src.step, 0, 3, d_hist_red, 1);
-    // extract_histogram_rgb<<<dimGrid, dimBlock, (257 * sizeof(int)) + (256 * sizeof(double))>>>(d_src.data, d_count_green, 1, d_src.cols, 0, d_src.rows, d_src.rows, d_src.cols, d_src.step, 1, 3, d_hist_green, 1);
-    // extract_histogram_rgb<<<dimGrid, dimBlock, (257 * sizeof(int)) + (256 * sizeof(double))>>>(d_src.data, d_count_blue, 2, d_src.cols, 0, d_src.rows, d_src.rows, d_src.cols, d_src.step, 2, 3, d_hist_blue, 1);
+    extract_histogram_rgb<<<dimGrid, dimBlock, (257 * sizeof(int)) + (256 * sizeof(double))>>>(d_src.data, d_count_red, 0, d_src.cols, 0, d_src.rows, d_src.rows, d_src.cols, d_src.step, 0, 3, d_hist_red, 1);
+    extract_histogram_rgb<<<dimGrid, dimBlock, (257 * sizeof(int)) + (256 * sizeof(double))>>>(d_src.data, d_count_green, 1, d_src.cols, 0, d_src.rows, d_src.rows, d_src.cols, d_src.step, 1, 3, d_hist_green, 1);
+    extract_histogram_rgb<<<dimGrid, dimBlock, (257 * sizeof(int)) + (256 * sizeof(double))>>>(d_src.data, d_count_blue, 2, d_src.cols, 0, d_src.rows, d_src.rows, d_src.cols, d_src.step, 2, 3, d_hist_blue, 1);
     // extract_histogram_rgb<<<dimGrid, dimBlock, (257 * sizeof(int)) + (256 * sizeof(double)) >>>(d_src.data, d_src.rows, d_src.cols, d_count, 0, d_src.cols, 0, d_src.rows, d_src.step, block_count, 1024, 0, d_src.channels(), d_hist);
     // wait for gpu to finish
-    // cudaDeviceSynchronize();
+    cudaDeviceSynchronize();
 
     // calculate_probability<<<1, 256>>>(d_hist, *d_count, d_prob);
     // cudaDeviceSynchronize();
 
     // buildLook_up_table<<<1, 256>>>(d_prob, d_lut);
 
-    // buildLook_up_table_rgb<<<1, 256>>>(d_hist_blue, d_hist_green, d_hist_red, *d_count_blue, true, d_final_lut, d_lut_blue, d_lut_green, d_lut_red);
-    // cudaDeviceSynchronize();
+    buildLook_up_table_rgb<<<1, 256>>>(d_hist_blue, d_hist_green, d_hist_red, *d_count_blue, true, d_final_lut, d_lut_blue, d_lut_green, d_lut_red);
+    cudaDeviceSynchronize();
 
-    
+    // lhe_build_luts<<<1, 1>>>(d_dp_luts, d_src.data, offset, 0, height, 0, width, width, height, d_src.channels(), d_src.step);
+    // cudaDeviceSynchronize();
     auto end_gpu = std::chrono::high_resolution_clock::now();
     // Download the histogram from the GPU
     // err = cudaMemcpy(h_hist, d_hist, histSize * sizeof(int), cudaMemcpyDeviceToHost);
