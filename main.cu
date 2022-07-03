@@ -101,8 +101,9 @@ calculate_luts_for_dynamic_programming(const uchar* img,
   }
   dim3 block(32, 32, 1);
   dim3 grid((2 * offset - 1) / 32 + 1, (2 * offset - 1) / 32 + 1, 1);
-  for (int i = 0; i < height; i++) {
-    if (i % offset == 0) {
+
+  for (int i = 0; i < height; i += offset) {
+    // if (i % offset == 0) {
       for (int j = 0; j < width; j += offset) {
         ZERO_OUT_RGB(u_hist_red, u_hist_green, u_hist_blue);
         ZERO_OUT_COUNTS(u_count_red, u_count_green, u_count_blue);
@@ -178,7 +179,7 @@ calculate_luts_for_dynamic_programming(const uchar* img,
         cudaDeviceSynchronize();
         VALIDATE_KERNEL_CALL();
       }
-    }
+    // }
   }
 
   cudaFree(u_hist_red);
@@ -197,7 +198,7 @@ int
 main()
 {
   // Load image
-  cv::Mat src = cv::imread("E:\\university\\Projects\\cyrus\\data\\1.jpg");
+  cv::Mat src = cv::imread("E:\\university\\Projects\\cyrus\\data\\2.jpg");
   // print image shape
   cout << "src shape" << src.size() << " " << src.channels() << endl;
 
@@ -274,6 +275,9 @@ main()
   // Upload image to GPU
   cv::cuda::GpuMat d_src;
   d_src.upload(src);
+  // create empty gpu matrix with the same size as the image
+  cv::cuda::GpuMat d_dst;
+  d_dst.create(d_src.size(), d_src.type());
 
   // Create histogram array for cpu and gpu
   //   int histSize = 256;
@@ -421,10 +425,10 @@ main()
   dim3 grid((x_max - 1) / 32 + 1, (y_max - 1) / 32 + 1, 1);
   CUDA_CHECK(
     cudaMallocManaged((void**)&d_dp_luts, sizeof(double**) * (max_i / offset)));
-  for (int i = 0; i < (max_i / offset); i++) {
+  for (int i = 0; i <= (max_i / offset); i++) {
     CUDA_CHECK(cudaMallocManaged((void**)&(d_dp_luts[i]),
                                  sizeof(double*) * (max_j / offset)));
-    for (int j = 0; j < (max_j / offset); j++) {
+    for (int j = 0; j <= (max_j / offset); j++) {
       CUDA_CHECK(
         cudaMallocManaged((void**)&(d_dp_luts[i][j]), sizeof(double) * 256));
     }
@@ -532,13 +536,31 @@ main()
   //   cudaDeviceSynchronize();
   lhe_build_luts<<<1, 4>>>(
     d_dp_luts, d_src.data, offset, width, height, d_src.channels(), d_src.step);
+    
   cudaDeviceSynchronize();
+  dim3 dimBlock(32, 32, 1);
+  dim3 dimGrid((d_src.cols * 2) / 32 + 2, (d_src.rows * 2) / 32 , 1);
+  apply_interpolating_lhe<<<dimGrid, dimBlock>>>(d_dst.data,
+                                                 d_src.data,
+                                                 151,
+                                                 offset,
+                                                 width,
+                                                 height,
+                                                 d_src.channels(),
+                                                 d_src.step,
+                                                 d_dp_luts);
+
+
+
+    cudaDeviceSynchronize();
+
+    // double ***d_dp_luts_gpu = 
   VALIDATE_KERNEL_CALL();
   // std::cout << "max_i: " << max_i << " max_j: " << max_j << std::endl;
 
-  // double*** u_dp_luts;
-  // u_dp_luts = calculate_luts_for_dynamic_programming(
-  //   d_src.data, d_src.rows, d_src.cols, d_src.channels(), d_src.step, 151);
+//   double*** u_dp_luts;
+//   u_dp_luts = calculate_luts_for_dynamic_programming(
+//     d_src.data, d_src.rows, d_src.cols, d_src.channels(), d_src.step, 151);
   auto end_gpu = std::chrono::high_resolution_clock::now();
   // Download the histogram from the GPU
   // err = cudaMemcpy(h_hist, d_hist, histSize * sizeof(int),
@@ -578,27 +600,37 @@ main()
 
   //   print the very first lut at 0, 0
 
-//   for (int i = 0; i < x_max; i++)
-//     for (int j = 0; j < y_max; j++) {
-//       for (int k = 0; k < 256; k++) {
-//         printf("%f ", d_dp_luts[i][j][k]);
-//       }
-//         printf("\n");
-//     }
+    // for (int i = 0; i < x_max; i++)
+    //   for (int j = 0; j < y_max; j++) {
+    //     for (int k = 0; k < 256; k++) {
+    //       printf("%f ", d_dp_luts[i][j][k]);
+    //     }
+    //       printf("\n");
+    //   }
+      printf("x_max: %d y_max: %d\n", x_max, y_max);
   //   for (int a = 0; a < 256; a++) {
   //     cout << d_dp_luts[0][1][a] << " ";
   //   }
   //   // print time taken on cpu and gpu
-    cout << "time taken on cpu: "
-         << std::chrono::duration_cast<std::chrono::milliseconds>(end -
-         start)
-              .count()
-         << " ms" << endl;
-    cout << "time taken on gpu: "
-         << std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu -
-                                                                  start_gpu)
-              .count()
-         << " ms" << endl;
+  cout << "time taken on cpu: "
+       << std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+            .count()
+       << " ms" << endl;
+  cout << "time taken on gpu: "
+       << std::chrono::duration_cast<std::chrono::milliseconds>(end_gpu -
+                                                                start_gpu)
+            .count()
+       << " ms" << endl;
+
+    // download d_dst to host memory
+    // and then show the result
+
+    cv::Mat dst_host(d_dst.rows, d_dst.cols, CV_8UC3);
+    d_dst.download(dst_host);
+
+    cv::imshow("src", src);
+    cv::imshow("dst", dst_host);
+    cv::waitKey(0);
   // free the allocated mem
   //   delete[] h_hist;
   //   // free cuda mem
