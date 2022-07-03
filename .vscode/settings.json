@@ -92,6 +92,7 @@
         "xutility": "cpp",
         "__nullptr": "cpp",
         "__bit_reference": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "__locale": "cpp"
     }
 }

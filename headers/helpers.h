@@ -31,7 +31,7 @@ __global__ void extract_histogram(const uchar* img, int *count, int x_start, int
 __global__ void calculate_probability(int *hist, int total_pixels, double *prob);
 __global__ void buildLook_up_table(double *prob, double *lut);
 __global__ void buildLook_up_table_rgb(int *hist_blue, int *hist_green, int *hist_red, int count, bool free_sw = true, double *lut_final = NULL, double *lut_blue = NULL, double *lut_green = NULL, double *lut_red = NULL);
-__global__ void lhe_build_luts(double ***all_luts, const uchar *img, int offset, int i_start, int i_end, int j_start, int j_end, int width, int height, int channel_c, int steps);
+__global__ void lhe_build_luts(double ***all_luts, const uchar *img, int offset, int width, int height, int channel_c, int steps);
 
 __global__ void apply_LHE(uchar *base, const uchar *img, int window, int width, int height, int steps, int channels_c);
 //end def gaurds
