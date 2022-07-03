@@ -1,25 +1,16 @@
 # Open a file that has this format
-# x <int> y <int> [before|after]
-# find "before" incidents that do not have "after" incident
+# <int> <int>
 
-
-before = []
-after = []
 file_path = ".\\out.txt"
+all_the_tuples = []
 with open(file_path, "r") as f:
     lines = f.readlines()
+    # See if there are any tuple in the file that are repeated more than once
     for line in lines:
         line = line.strip()
-        if line.startswith("x"):
-            x = int(line.split()[1])
-            y = int(line.split()[3])
-            if line.split()[4] == "before":
-                before.append((x, y))
-            else:
-                after.append((x, y))
-
-# Find tuples that are in before but not in after
-print(len(list(set(before))), len(list(set(after))))
-for t in before:
-    if t not in after:
-        print(t)
+        line = line.split(" ")
+        line = tuple(line)
+        if line in all_the_tuples:
+            print("Repeated tuple: ", line)
+            continue
+        all_the_tuples.append(line)
