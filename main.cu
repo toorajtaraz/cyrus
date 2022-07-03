@@ -104,81 +104,81 @@ calculate_luts_for_dynamic_programming(const uchar* img,
 
   for (int i = 0; i < height; i += offset) {
     // if (i % offset == 0) {
-      for (int j = 0; j < width; j += offset) {
-        ZERO_OUT_RGB(u_hist_red, u_hist_green, u_hist_blue);
-        ZERO_OUT_COUNTS(u_count_red, u_count_green, u_count_blue);
-        int i_start, i_end, j_start, j_end;
-        i_start = i - offset;
-        i_end = i + offset;
-        j_start = j - offset;
-        j_end = j + offset;
-        if (i_start < 0) {
-          i_start = 0;
-        }
-        if (i_end > height) {
-          i_end = height;
-        }
-        if (j_start < 0) {
-          j_start = 0;
-        }
-        if (j_end > width) {
-          j_end = width;
-        }
-
-        extract_histogram_rgb<<<grid, block>>>(img,
-                                               u_count_red,
-                                               i_start,
-                                               i_end,
-                                               j_start,
-                                               j_end,
-                                               width,
-                                               height,
-                                               steps,
-                                               0,
-                                               3,
-                                               u_hist_red,
-                                               1);
-        extract_histogram_rgb<<<grid, block>>>(img,
-                                               u_count_green,
-                                               i_start,
-                                               i_end,
-                                               j_start,
-                                               j_end,
-                                               width,
-                                               height,
-                                               steps,
-                                               1,
-                                               3,
-                                               u_hist_green,
-                                               1);
-        extract_histogram_rgb<<<grid, block>>>(img,
-                                               u_count_blue,
-                                               i_start,
-                                               i_end,
-                                               j_start,
-                                               j_end,
-                                               width,
-                                               height,
-                                               steps,
-                                               2,
-                                               3,
-                                               u_hist_blue,
-                                               1);
-        cudaDeviceSynchronize();
-        VALIDATE_KERNEL_CALL();
-        buildLook_up_table_rgb<<<1, 256>>>(
-          u_hist_blue,
-          u_hist_green,
-          u_hist_red,
-          *u_count_blue,
-          true,
-          unified_mem_luts[i / offset][j / offset],
-          u_lut_blue,
-          u_lut_green,
-          u_lut_red);
-        cudaDeviceSynchronize();
-        VALIDATE_KERNEL_CALL();
+    for (int j = 0; j < width; j += offset) {
+      ZERO_OUT_RGB(u_hist_red, u_hist_green, u_hist_blue);
+      ZERO_OUT_COUNTS(u_count_red, u_count_green, u_count_blue);
+      int i_start, i_end, j_start, j_end;
+      i_start = i - offset;
+      i_end = i + offset;
+      j_start = j - offset;
+      j_end = j + offset;
+      if (i_start < 0) {
+        i_start = 0;
       }
+      if (i_end > height) {
+        i_end = height;
+      }
+      if (j_start < 0) {
+        j_start = 0;
+      }
+      if (j_end > width) {
+        j_end = width;
+      }
+
+      extract_histogram_rgb<<<grid, block>>>(img,
+                                             u_count_red,
+                                             i_start,
+                                             i_end,
+                                             j_start,
+                                             j_end,
+                                             width,
+                                             height,
+                                             steps,
+                                             0,
+                                             3,
+                                             u_hist_red,
+                                             1);
+      extract_histogram_rgb<<<grid, block>>>(img,
+                                             u_count_green,
+                                             i_start,
+                                             i_end,
+                                             j_start,
+                                             j_end,
+                                             width,
+                                             height,
+                                             steps,
+                                             1,
+                                             3,
+                                             u_hist_green,
+                                             1);
+      extract_histogram_rgb<<<grid, block>>>(img,
+                                             u_count_blue,
+                                             i_start,
+                                             i_end,
+                                             j_start,
+                                             j_end,
+                                             width,
+                                             height,
+                                             steps,
+                                             2,
+                                             3,
+                                             u_hist_blue,
+                                             1);
+      cudaDeviceSynchronize();
+      VALIDATE_KERNEL_CALL();
+      buildLook_up_table_rgb<<<1, 256>>>(
+        u_hist_blue,
+        u_hist_green,
+        u_hist_red,
+        *u_count_blue,
+        true,
+        unified_mem_luts[i / offset][j / offset],
+        u_lut_blue,
+        u_lut_green,
+        u_lut_red);
+      cudaDeviceSynchronize();
+      VALIDATE_KERNEL_CALL();
+    }
     // }
   }
 
@@ -203,31 +203,36 @@ main()
   cout << "src shape" << src.size() << " " << src.channels() << endl;
 
   // //resize image to 1/3 of its size
-  // cv::Mat src_resized;
-  // cv::resize(src, src_resized, cv::Size(), 0.33, 0.33);
+  cv::Mat src_resized;
+  cv::resize(src, src_resized, cv::Size(), 0.1, 0.1);
 
   // //copy the resized image to gpu
-  // cv::cuda::GpuMat src_resized_gpu;
-  // src_resized_gpu.upload(src_resized);
+  cv::cuda::GpuMat src_resized_gpu;
+  src_resized_gpu.upload(src_resized);
 
   // //create a gpu matrix with the same size as the resized image
-  // cv::cuda::GpuMat dst_gpu;
-  // dst_gpu.create(src_resized_gpu.size(), src_resized_gpu.type());
-
-  // apply_LHE<<<1, 2>>>(dst_gpu.data, src_resized_gpu.data, 151,
-  // src_resized_gpu.cols, src_resized_gpu.rows, src_resized_gpu.step,
-  // src_resized_gpu.channels()); cudaDeviceSynchronize();
+  cv::cuda::GpuMat dst_gpu;
+  dst_gpu.create(src_resized_gpu.size(), src_resized_gpu.type());
+    std::cout << "src_resized_gpu.size()" << src_resized_gpu.size() << endl;
+  apply_LHE<<<1, 32>>>(dst_gpu.data,
+                      src_resized_gpu.data,
+                      31,
+                      src_resized_gpu.cols,
+                      src_resized_gpu.rows,
+                      src_resized_gpu.step,
+                      src_resized_gpu.channels());
+  cudaDeviceSynchronize();
 
   // //copy the gpu matrix to cpu
-  // cv::Mat dst;
-  // src_resized_gpu.download(dst);
+  cv::Mat dst;
+  dst_gpu.download(dst);
 
-  // //show the result
-  // cv::imshow("src", src);
-  // cv::imshow("src_resized", src_resized);
-  // cv::imshow("dst", dst);
-  // cv::waitKey(0);
-  // return 0;
+  //show the result
+//   cv::imshow("src", src);
+//   cv::imshow("src_resized", src_resized);
+  cv::imshow("dst", dst);
+  cv::waitKey(0);
+  return 0;
 
   /***********************************************************************************/
   int* hist = new int[256]{ 0 };
@@ -534,33 +539,31 @@ main()
   //                                      d_lut_green,
   //                                      d_lut_red);
   //   cudaDeviceSynchronize();
-  lhe_build_luts<<<1, 4>>>(
-    d_dp_luts, d_src.data, offset, width, height, d_src.channels(), d_src.step);
-    
-  cudaDeviceSynchronize();
-  dim3 dimBlock(32, 32, 1);
-  dim3 dimGrid((d_src.cols * 2) / 32 + 2, (d_src.rows * 2) / 32 , 1);
-  apply_interpolating_lhe<<<dimGrid, dimBlock>>>(d_dst.data,
-                                                 d_src.data,
-                                                 151,
-                                                 offset,
-                                                 width,
-                                                 height,
-                                                 d_src.channels(),
-                                                 d_src.step,
-                                                 d_dp_luts);
+//   lhe_build_luts<<<1, 4>>>(
+//     d_dp_luts, d_src.data, offset, width, height, d_src.channels(), d_src.step);
 
+//   cudaDeviceSynchronize();
+//   dim3 dimBlock(32, 32, 1);
+//   dim3 dimGrid((d_src.cols * 2) / 32 + 2, (d_src.rows * 2) / 32, 1);
+//   apply_interpolating_lhe<<<dimGrid, dimBlock>>>(d_dst.data,
+//                                                  d_src.data,
+//                                                  151,
+//                                                  offset,
+//                                                  width,
+//                                                  height,
+//                                                  d_src.channels(),
+//                                                  d_src.step,
+//                                                  d_dp_luts);
 
+//   cudaDeviceSynchronize();
 
-    cudaDeviceSynchronize();
-
-    // double ***d_dp_luts_gpu = 
+  // double ***d_dp_luts_gpu =
   VALIDATE_KERNEL_CALL();
   // std::cout << "max_i: " << max_i << " max_j: " << max_j << std::endl;
 
-//   double*** u_dp_luts;
-//   u_dp_luts = calculate_luts_for_dynamic_programming(
-//     d_src.data, d_src.rows, d_src.cols, d_src.channels(), d_src.step, 151);
+  //   double*** u_dp_luts;
+  //   u_dp_luts = calculate_luts_for_dynamic_programming(
+  //     d_src.data, d_src.rows, d_src.cols, d_src.channels(), d_src.step, 151);
   auto end_gpu = std::chrono::high_resolution_clock::now();
   // Download the histogram from the GPU
   // err = cudaMemcpy(h_hist, d_hist, histSize * sizeof(int),
@@ -600,14 +603,14 @@ main()
 
   //   print the very first lut at 0, 0
 
-    // for (int i = 0; i < x_max; i++)
-    //   for (int j = 0; j < y_max; j++) {
-    //     for (int k = 0; k < 256; k++) {
-    //       printf("%f ", d_dp_luts[i][j][k]);
-    //     }
-    //       printf("\n");
-    //   }
-      printf("x_max: %d y_max: %d\n", x_max, y_max);
+  // for (int i = 0; i < x_max; i++)
+  //   for (int j = 0; j < y_max; j++) {
+  //     for (int k = 0; k < 256; k++) {
+  //       printf("%f ", d_dp_luts[i][j][k]);
+  //     }
+  //       printf("\n");
+  //   }
+  printf("x_max: %d y_max: %d\n", x_max, y_max);
   //   for (int a = 0; a < 256; a++) {
   //     cout << d_dp_luts[0][1][a] << " ";
   //   }
@@ -622,15 +625,16 @@ main()
             .count()
        << " ms" << endl;
 
-    // download d_dst to host memory
-    // and then show the result
+  // download d_dst to host memory
+  // and then show the result
 
-    cv::Mat dst_host(d_dst.rows, d_dst.cols, CV_8UC3);
-    d_dst.download(dst_host);
+  cv::Mat dst_host(d_dst.rows, d_dst.cols, CV_8UC3);
+  d_dst.download(dst_host);
 
-    cv::imshow("src", src);
-    cv::imshow("dst", dst_host);
-    cv::waitKey(0);
+//   cv::imshow("src", src);
+//   cv::imshow("dst", dst_host);
+
+//   cv::waitKey(0);
   // free the allocated mem
   //   delete[] h_hist;
   //   // free cuda mem

@@ -275,325 +275,324 @@ buildLook_up_table_rgb(int* hist_blue,
       (lut_blue[index] + lut_green[index] + lut_red[index]) / 3.0;
 }
 
-__device__ void apply_LHE_helper(uchar *base, const uchar *img, dim3
-dimBlock, dim3 dimGrid, int **hists, int *hist, int *count, int *temp, int
-window, int i_start, int i_end, int width, int height, int steps, int
-channels_c)
+__device__ void
+apply_LHE_helper(uchar* base,
+                 const uchar* img,
+                 dim3 dimBlock,
+                 dim3 dimGrid,
+                 int** hists,
+                 int* hist,
+                 int* count,
+                 int* temp,
+                 int window,
+                 int i_start,
+                 int i_end,
+                 int width,
+                 int height,
+                 int steps,
+                 int channels_c)
 {
-    int offset = (int)floor(window / 2.0);
-    int sw = 0;
 
-    for (int i = i_start; i < i_end; i++)
-    {
-        sw = i % 2 == (i_start % 2) ? 0 : 1;
-        if (sw == 1)
-        {
-            for (int j = width - 1; j >= 0; j--)
-            {
-                if (j == (width - 1))
-                {
-                    for (int n = 0; n < window; n++)
-                    {
-                        if (channels_c > 1)
-                        {
-                            for (auto k = 0; k < channels_c; k++)
-                            {
-                                *temp = *count;
-                                extract_histogram_rgb<<<1, 1>>>(img, temp, i
-                                - 1 - offset, i - 1 - offset + 1, j + n -
-                                offset, j + n - offset + 1, width, height,
-                                steps, k, 3, hists[k], -1);
-                                extract_histogram_rgb<<<1, 1>>>(img, temp, i
-                                + window - 1 - offset, i + window - 1 -
-                                offset + 1, j + n - offset, j + n - offset +
-                                1, width, height, steps, k, 3, hists[k], 1);
-                            }
-                            // cudaDeviceSynchronize();
+  int offset = (int)floor(window / 2.0);
+  int sw = 0;
+  double** lut = new double*[channels_c + 1];
+  for (int i = 0; i <= channels_c; i++) {
+    lut[i] = new double[256];
+  }
 
-                            *count = *temp;
-                        }
-                        else
-                        {
-                            extract_histogram<<<1, 1>>>(img, count, i - 1 -
-                            offset, i - 1 - offset + 1, j + n - offset, j + n
-                            - offset + 1, width, height, steps, hist, -1);
-                            extract_histogram<<<1, 1>>>(img, count, i +
-                            window - 1 - offset, i + window - 1 - offset + 1,
-                            j + n - offset, j + n - offset + 1, width,
-                            height, steps, hist, 1);
-                            // cudaDeviceSynchronize();
-                        }
-                    }
-                }
-                else if (j < (width - 1))
-                {
-                    for (int n = 0; n < window; n++)
-                    {
-                        if (channels_c > 1)
-                        {
-                            for (auto k = 0; k < channels_c; k++)
-                            {
-                                *temp = *count;
-                                extract_histogram_rgb<<<1, 1>>>(img, temp, i
-                                + n - offset, i + n - offset + 1, j - offset,
-                                j - offset + 1, width, height, steps, k, 3,
-                                hists[k], 1); extract_histogram_rgb<<<1,
-                                1>>>(img, temp, i + n - offset, i + n -
-                                offset + 1, j + window - offset, j + window -
-                                offset + 1, width, height, steps, k, 3,
-                                hists[k], -1);
-                            }
-                            // cudaDeviceSynchronize();
+  for (int i = i_start; i < i_end; i++) {
+    sw = i % 2 == (i_start % 2) ? 0 : 1;
+    if (sw == 1) {
+      for (int j = width - 1; j >= 0; j--) {
+        if (j == (width - 1)) {
+          for (auto k = 0; k < channels_c; k++) {
+            *temp = *count;
+            extract_histogram_rgb<<<1, window>>>(img,
+                                                 temp,
+                                                 i - 1 - offset,
+                                                 i - 1 - offset + 1,
+                                                 j - offset,
+                                                 j + offset,
+                                                 width,
+                                                 height,
+                                                 steps,
+                                                 k,
+                                                 3,
+                                                 hists[k],
+                                                 -1);
+            cudaDeviceSynchronize();
 
-                            *count = *temp;
-                        }
-                        else
-                        {
-                            extract_histogram<<<1, 1>>>(img, count, i + n -
-                            offset, i + n - offset + 1, j - offset, j -
-                            offset + 1, width, height, steps, hist, 1);
-                            extract_histogram<<<1, 1>>>(img, count, i + n -
-                            offset, i + n - offset + 1, j + window - offset,
-                            j + window - offset + 1, width, height, steps,
-                            hist, -1);
-                            // cudaDeviceSynchronize();
-                        }
-                    }
-                }
-                *count = *count > 0 ? *count : 1;
-                if (channels_c > 1)
-                {
-                    double *lut = new double[256];
-                    buildLook_up_table_rgb<<<1, 256>>>(hists[0], hists[1],
-                    hists[2], *count, true, lut);
-                    // cudaDeviceSynchronize();
+            extract_histogram_rgb<<<1, window>>>(img,
+                                                 temp,
+                                                 i + window - 1 - offset,
+                                                 i + window - 1 - offset + 1,
+                                                 j - offset,
+                                                 j + offset,
+                                                 width,
+                                                 height,
+                                                 steps,
+                                                 k,
+                                                 3,
+                                                 hists[k],
+                                                 1);
+            cudaDeviceSynchronize();
+          }
 
-                    for (auto k = 0; k < channels_c; k++)
-                    {
-                        // base[j * steps + i * k] = img[j * steps + i * k];
-                        // base.at<cv::Vec3b>(i, j)[k] =
-                        // (uchar)lut[img.at<cv::Vec3b>(i, j)[k]];
-                    }
-                    delete[] lut;
-                }
-                else
-                {
-                    double *prob = new double[256];
-                    calculate_probability<<<1, 256>>>(hist, *count, prob);
-                    // cudaDeviceSynchronize();
+          *count = *temp;
 
-                    double *lut = new double[256];
-                    buildLook_up_table<<<1, 256>>>(prob, lut);
-                    // cudaDeviceSynchronize();
+        } else if (j < (width - 1)) {
 
-                    // base[j * steps + i] = img[j * steps + i];
-                    // base.at<uchar>(i, j) = (int)floor(lut[img.at<uchar>(i,
-                    // j)]);
-                    // Clean memory
-                    delete[] prob;
-                    delete[] lut;
-                }
-            }
+          for (auto k = 0; k < channels_c; k++) {
+            *temp = *count;
+            extract_histogram_rgb<<<1, window>>>(img,
+                                                 temp,
+                                                 i - offset,
+                                                 i + offset,
+                                                 j - offset,
+                                                 j - offset + 1,
+                                                 width,
+                                                 height,
+                                                 steps,
+                                                 k,
+                                                 3,
+                                                 hists[k],
+                                                 1);
+            cudaDeviceSynchronize();
+
+            extract_histogram_rgb<<<1, window>>>(img,
+                                                 temp,
+                                                 i - offset,
+                                                 i + offset,
+                                                 j + window - offset,
+                                                 j + window - offset + 1,
+                                                 width,
+                                                 height,
+                                                 steps,
+                                                 k,
+                                                 3,
+                                                 hists[k],
+                                                 -1);
+            cudaDeviceSynchronize();
+          }
+
+          *count = *temp;
         }
-        else
-        {
-            for (int j = 0; j < width; j++)
-            {
-                if (j == 0 && i > i_start)
-                {
-                    for (int n = 0; n < window; n++)
-                    {
-                        if (channels_c > 1)
-                        {
-                            for (auto k = 0; k < channels_c; k++)
-                            {
-                                *temp = *count;
-                                extract_histogram_rgb<<<1, 1>>>(img, temp, i
-                                - 1 - offset, i - 1 - offset + 1, j + n -
-                                offset, j + n - offset + 1, width, height,
-                                steps, k, 3, hists[k], -1);
-                                extract_histogram_rgb<<<1, 1>>>(img, temp, i
-                                + window - 1 - offset, i + window - 1 -
-                                offset + 1, j + n - offset, j + n - offset +
-                                1, width, height, steps, k, 3, hists[k], 1);
-                            }
-                            // cudaDeviceSynchronize();
+        *count = *count > 0 ? *count : 1;
 
-                            *count = *temp;
-                        }
-                        else
-                        {
-                            extract_histogram<<<1, 1>>>(img, count, i - 1 -
-                            offset, i - 1 - offset + 1, j + n - offset, j + n
-                            - offset + 1, width, height, steps, hist, -1);
-                            extract_histogram<<<1, 1>>>(img, count, i +
-                            window - 1 - offset, i + window - 1 - offset + 1,
-                            j + n - offset, j + n - offset + 1, width,
-                            height, steps, hist, 1);
-                            // cudaDeviceSynchronize();
-                        }
-                    }
-                }
-                else if (j == 0 && i == i_start)
-                {
-                    for (int n = 0; n < window; n++)
-                    {
-                        for (int m = 0; m < window; m++)
-                        {
-                            if (channels_c > 1)
-                            {
-                                for (auto k = 0; k < channels_c; k++)
-                                {
-                                    *temp = *count;
-                                    extract_histogram_rgb<<<1, 1>>>(img,
-                                    temp, i + n - offset, i + n - offset + 1,
-                                    j + m - offset, j + m - offset + 1,
-                                    width, height, steps, k, 3, hists[k], 1);
-                                }
-                                // cudaDeviceSynchronize();
+        buildLook_up_table_rgb<<<1, 256>>>(hists[0],
+                                           hists[1],
+                                           hists[2],
+                                           *count,
+                                           true,
+                                           lut[3],
+                                           lut[0],
+                                           lut[1],
+                                           lut[2]);
+        cudaDeviceSynchronize();
 
-                                *count = *temp;
-                            }
-                            else
-                            {
-                                extract_histogram<<<1, 1>>>(img, count, i + n
-                                - offset, i + n - offset + 1, j + m - offset,
-                                j + m - offset + 1, width, height, steps,
-                                hist, 1);
-                                // cudaDeviceSynchronize();
-                            }
-                            printf("extractions goes well and count is %d\n",
-                            *count);
-                        }
-                    }
-                }
-                else if (j > 0)
-                {
-                    for (int n = 0; n < window; n++)
-                    {
-                        if (channels_c > 1)
-                        {
-                            for (auto k = 0; k < channels_c; k++)
-                            {
-                                *temp = *count;
-                                extract_histogram_rgb<<<1, 1>>>(img, temp, i
-                                + n - offset, i + n - offset + 1, j - 1 -
-                                offset, j - 1 - offset + 1, width, height,
-                                steps, k, 3, hists[k], -1);
-                                extract_histogram_rgb<<<1, 1>>>(img, temp, i
-                                + n - offset, i + n - offset + 1, j + window
-                                - 1 - offset, j + window - 1 - offset + 1,
-                                width, height, steps, k, 3, hists[k], 1);
-                            }
-                            // cudaDeviceSynchronize();
-
-                            *count = *temp;
-                        }
-                        else
-                        {
-                            extract_histogram<<<1, 1>>>(img, count, i + n -
-                            offset, i + n - offset + 1, j - 1 - offset, j - 1
-                            - offset + 1, width, height, steps, hist, -1);
-                            extract_histogram<<<1, 1>>>(img, count, i + n -
-                            offset, i + n - offset + 1, j + window - 1 -
-                            offset, j + window - 1 - offset + 1, width,
-                            height, steps, hist, 1);
-                            // cudaDeviceSynchronize();
-                        }
-                    }
-                }
-                *count = *count > 0 ? *count : 1;
-                if (channels_c > 1)
-                {
-                    double *lut = new double[256];
-                    buildLook_up_table_rgb<<<1, 256>>>(hists[0], hists[1],
-                    hists[2], *count, true, lut);
-                    // cudaDeviceSynchronize();
-
-                    // for (auto k = 0; k < channels_c; k++)
-                    // {
-                    //     // base[j * steps + i * k] = img[j * steps + i * k];
-                    //     // base.at<cv::Vec3b>(i, j)[k] =
-                    //     // (uchar)lut[img.at<cv::Vec3b>(i, j)[k]];
-                    // }
-                    delete[] lut;
-                }
-                else
-                {
-                    double *prob = new double[256];
-                    calculate_probability<<<1, 256>>>(hist, *count, prob);
-                    // cudaDeviceSynchronize();
-
-                    double *lut = new double[256];
-                    buildLook_up_table<<<1, 256>>>(prob, lut);
-                    // cudaDeviceSynchronize();
-
-                    // base[j * steps + i] = img[j * steps + i];
-                    // base.at<uchar>(i, j) = (int)floor(lut[img.at<uchar>(i,
-                    // j)]);
-                    // Clean memory
-                    delete[] prob;
-                    delete[] lut;
-                }
-            }
+        for (auto k = 0; k < channels_c; k++) {
+          base[j * steps + i * channels_c + k] =
+            img[j * steps + i * channels_c + k];
+          // base.at<cv::Vec3b>(i, j)[k] =
+          // (uchar)lut[img.at<cv::Vec3b>(i, j)[k]];
         }
+      }
+    } else {
+      for (int j = 0; j < width; j++) {
+        if (j == 0 && i > i_start) {
+
+          for (auto k = 0; k < channels_c; k++) {
+            *temp = *count;
+            extract_histogram_rgb<<<1, window>>>(img,
+                                                 temp,
+                                                 i - 1 - offset,
+                                                 i - 1 - offset + 1,
+                                                 j - offset,
+                                                 j + offset,
+                                                 width,
+                                                 height,
+                                                 steps,
+                                                 k,
+                                                 3,
+                                                 hists[k],
+                                                 -1);
+            cudaDeviceSynchronize();
+
+            extract_histogram_rgb<<<1, window>>>(img,
+                                                 temp,
+                                                 i + window - 1 - offset,
+                                                 i + window - 1 - offset + 1,
+                                                 j - offset,
+                                                 j + offset,
+                                                 width,
+                                                 height,
+                                                 steps,
+                                                 k,
+                                                 3,
+                                                 hists[k],
+                                                 1);
+            cudaDeviceSynchronize();
+          }
+
+          *count = *temp;
+
+        } else if (j == 0 && i == i_start) {
+
+          for (auto k = 0; k < channels_c; k++) {
+            *temp = *count;
+            extract_histogram_rgb<<<window, window>>>(img,
+                                                      temp,
+                                                      i - offset,
+                                                      i + offset,
+                                                      j - offset,
+                                                      j + offset,
+                                                      width,
+                                                      height,
+                                                      steps,
+                                                      k,
+                                                      3,
+                                                      hists[k],
+                                                      1);
+            cudaDeviceSynchronize();
+          }
+
+          *count = *temp;
+
+        } else if (j > 0) {
+          for (int n = 0; n < window; n++) {
+
+            for (auto k = 0; k < channels_c; k++) {
+              *temp = *count;
+              extract_histogram_rgb<<<1, window>>>(img,
+                                                   temp,
+                                                   i - offset,
+                                                   i + offset,
+                                                   j - 1 - offset,
+                                                   j - 1 - offset + 1,
+                                                   width,
+                                                   height,
+                                                   steps,
+                                                   k,
+                                                   3,
+                                                   hists[k],
+                                                   -1);
+              cudaDeviceSynchronize();
+
+              extract_histogram_rgb<<<1, window>>>(img,
+                                                   temp,
+                                                   i - offset,
+                                                   i + offset,
+                                                   j + window - 1 - offset,
+                                                   j + window - 1 - offset + 1,
+                                                   width,
+                                                   height,
+                                                   steps,
+                                                   k,
+                                                   3,
+                                                   hists[k],
+                                                   1);
+              cudaDeviceSynchronize();
+            }
+
+            *count = *temp;
+          }
+        }
+        *count = *count > 0 ? *count : 1;
+
+        buildLook_up_table_rgb<<<1, 256>>>(hists[0],
+                                           hists[1],
+                                           hists[2],
+                                           *count,
+                                           true,
+                                           lut[3],
+                                           lut[0],
+                                           lut[1],
+                                           lut[2]);
+        cudaDeviceSynchronize();
+
+        for (auto k = 0; k < channels_c; k++) {
+          base[j * steps + i * channels_c + k] =
+            img[j * steps + i * channels_c + k];
+          //     // base[j * steps + i * k] = img[j * steps + i * k];
+          //     // base.at<cv::Vec3b>(i, j)[k] =
+          //     // (uchar)lut[img.at<cv::Vec3b>(i, j)[k]];
+        }
+      }
     }
+  }
+  for (auto k = 0; k <= channels_c; k++) {
+    delete[] lut[k];
+  }
+  delete[] lut;
 }
 
-__global__ void apply_LHE(uchar *base, const uchar *img, int window, int
-width, int height, int steps, int channels_c)
+__global__ void
+apply_LHE(uchar* base,
+          const uchar* img,
+          int window,
+          int width,
+          int height,
+          int steps,
+          int channels_c)
 {
-    int total_threads = blockDim.x;
-    int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
-    int _temp = width / total_threads;
-    int i_start = thread_id * _temp;
-    int i_end = (thread_id + 1) * _temp;
-    dim3 dimBlock(32, 32, 1);
-    dim3 dimGrid((window - 1) / 32 + 1, (window - 1) / 32 + 1, 1);
-    int *temp;
-    int *count;
-    int **hists;
-    int *hist;
+  int total_threads = blockDim.x;
+  int thread_id = blockDim.x * blockIdx.x + threadIdx.x;
+  int _temp = width / total_threads;
+  int i_start = thread_id * _temp;
+  int i_end = (thread_id + 1) * _temp;
 
-    count = new int[1];
-    temp = new int[1];
-    *count = 0;
-    *temp = 0;
-    if (channels_c > 1)
-    {
-        hists = new int *[channels_c];
-        for (auto i = 0; i < channels_c; i++)
-        {
-            hists[i] = new int[PIXEL_RANGE]();
-        }
-    }
-    else
-    {
-        hist = new int[PIXEL_RANGE]();
-    }
+  dim3 dimBlock(32, 32, 1);
+  dim3 dimGrid((window - 1) / 32 + 1, (window - 1) / 32 + 1, 1);
+  int* temp;
+  int* count;
+  int** hists;
+  int* hist;
 
-    if (thread_id == (total_threads - 1))
-    {
-        i_end = width;
+  count = new int[1];
+  temp = new int[1];
+  *count = 0;
+  *temp = 0;
+  if (channels_c > 1) {
+    hists = new int*[channels_c];
+    for (auto i = 0; i < channels_c; i++) {
+      hists[i] = new int[PIXEL_RANGE]();
+      memset(hists[i], 0, PIXEL_RANGE * sizeof(int));
     }
-    // printf("pointer address to hists is %p\n", hists);
-    __syncthreads();
-    apply_LHE_helper(base, img, dimBlock, dimGrid, hists, hist, count, temp,
-    window, i_start, i_end, width, height, steps, channels_c);
-    __syncthreads();
+  } else {
+    hist = new int[PIXEL_RANGE]();
+  }
 
-    if (channels_c > 1)
-    {
-        // delete channels
-        for (auto k = 0; k < channels_c; k++)
-        {
-            delete[] hists[k];
-        }
+  if (thread_id == (total_threads - 1)) {
+    i_end = width;
+  }
+  // printf("pointer address to hists is %p\n", hists);
+  __syncthreads();
+  apply_LHE_helper(base,
+                   img,
+                   dimBlock,
+                   dimGrid,
+                   hists,
+                   NULL,
+                   count,
+                   temp,
+                   window,
+                   i_start,
+                   i_end,
+                   width,
+                   height,
+                   steps,
+                   channels_c);
+  __syncthreads();
+
+//   if (channels_c > 1) {
+//     // delete channels
+    for (auto k = 0; k < channels_c; k++) {
+      delete[] hists[k];
     }
-    else
-    {
-        delete[] hist;
-    }
+    delete[] hists;
+//   } else {
+//     delete[] hist;
+//   }
 }
 
 __global__ void
@@ -850,11 +849,9 @@ apply_interpolating_lhe(uchar* base,
   if (i >= height || j >= width) {
     return;
   }
-//   if (x1 > height || y1 > width || x2 > height || y2 > width) {
-//     return;
-//   }
-
-
+  //   if (x1 > height || y1 > width || x2 > height || y2 > width) {
+  //     return;
+  //   }
 
   double x1_weight = (double)(i - x1) / (double)(x2 - x1);
   double y1_weight = (double)(j - y1) / (double)(y2 - y1);
@@ -870,14 +867,13 @@ apply_interpolating_lhe(uchar* base,
 #define lower_left_lut all_luts[x2_lut][y1_lut]
 #define lower_right_lut all_luts[x2_lut][y2_lut]
 
-
   for (auto k = 0; k < channel_n; k++) {
     uchar temp_pixel = img[j * steps + i * channel_n + k];
-    uchar new_value =
-      (uchar)floor((float)(upper_left_lut[temp_pixel] * x2_weight * y2_weight +
-                          upper_right_lut[temp_pixel] * x2_weight * y1_weight +
-                          lower_left_lut[temp_pixel] * x1_weight * y2_weight +
-                          lower_right_lut[temp_pixel] * x1_weight * y1_weight));
+    uchar new_value = (uchar)floor(
+      (float)(upper_left_lut[temp_pixel] * x2_weight * y2_weight +
+              upper_right_lut[temp_pixel] * x2_weight * y1_weight +
+              lower_left_lut[temp_pixel] * x1_weight * y2_weight +
+              lower_right_lut[temp_pixel] * x1_weight * y1_weight));
     // printf("%d\n", new_value);
     base[j * steps + i * channel_n + k] = new_value;
     //   (uchar)(upper_left_lut[temp_pixel] * x2_weight * y2_weight +
