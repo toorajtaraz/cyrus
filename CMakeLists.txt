@@ -19,10 +19,14 @@ include_directories( ${CUDA_INCLUDE_DIRS} )
 set( NAME_SRC
   main.cu
   utils/helpers.cu
+  utils/interpolating_lhe.cu 
+  utils/lhe.cu
 )
 
 set( NAME_HEADERS
   headers/helpers.h
+  headers/interpolating_lhe.h
+  headers/lhe.h
 )
 
 INCLUDE_DIRECTORIES( ${CMAKE_CURRENT_SOURCE_DIR}/headers )
