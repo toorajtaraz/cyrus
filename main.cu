@@ -198,7 +198,7 @@ int
 main()
 {
   // Load image
-  cv::Mat src = cv::imread("E:\\university\\Projects\\cyrus\\data\\2.jpg");
+  cv::Mat src = cv::imread("E:\\university\\Projects\\cyrus\\data\\1.jpg");
   // print image shape
   cout << "src shape" << src.size() << " " << src.channels() << endl;
 
@@ -214,9 +214,9 @@ main()
   cv::cuda::GpuMat dst_gpu;
   dst_gpu.create(src_resized_gpu.size(), src_resized_gpu.type());
     std::cout << "src_resized_gpu.size()" << src_resized_gpu.size() << endl;
-  apply_LHE<<<1, 32>>>(dst_gpu.data,
+  apply_LHE<<<1, 64>>>(dst_gpu.data,
                       src_resized_gpu.data,
-                      31,
+                      151,
                       src_resized_gpu.cols,
                       src_resized_gpu.rows,
                       src_resized_gpu.step,

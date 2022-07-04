@@ -1,102 +1,5 @@
 #include <helpers.h>
-__global__ void
-__extract_histogram(const uchar* img,
-                    int* count,
-                    int x_start,
-                    int x_end,
-                    int y_start,
-                    int y_end,
-                    int width,
-                    int height,
-                    int steps,
-                    int* histt,
-                    int sw)
-{
-  extern __shared__ int sh_histt[];
 
-  int index = threadIdx.y * blockDim.y + threadIdx.x;
-  // devid 256 by total number of threads in 2d block
-  int s = 256 / (blockDim.x * blockDim.y);
-
-  if (index == 0) {
-    sh_histt[256] = 0;
-  }
-
-  if (s < 1)
-    s = 1;
-
-  for (int i = index * s; i < (index * s + 1); i++)
-    if (i < 256) {
-      sh_histt[i] = 0;
-    }
-
-  __syncthreads();
-
-  if (x_start < height && y_start < width && x_start >= 0 && y_start >= 0) {
-
-    atomicAdd(&sh_histt[256], sw);
-    atomicAdd(&sh_histt[img[y_start * steps + x_start]], sw);
-  }
-
-  __syncthreads();
-  if (index == 0) {
-    atomicAdd(&count[0], sh_histt[256]);
-  }
-
-  if (index < 256) {
-    atomicAdd(&histt[index], sh_histt[index]);
-  }
-}
-__global__ void
-__extract_histogram_rgb(const uchar* img,
-                        int* count,
-                        int x_start,
-                        int x_end,
-                        int y_start,
-                        int y_end,
-                        int width,
-                        int height,
-                        int steps,
-                        short channel,
-                        short channels_c,
-                        int* histt,
-                        int sw)
-{
-  extern __shared__ int sh_histt[];
-
-  // calculate global id
-  int index = threadIdx.y * blockDim.y + threadIdx.x;
-  int s = 256 / (blockDim.x * blockDim.y);
-
-  if (index == 0) {
-    sh_histt[256] = 0;
-  }
-
-  if (s < 1)
-    s = 1;
-
-  for (int i = index * s; i < (index * (s + 1)); i++)
-    if (i < 256) {
-      sh_histt[i] = 0;
-    }
-
-  __syncthreads();
-  // do if boundary is valid
-  for (auto i = x_start; i < x_end && i < height; i++)
-    for (auto j = y_start; j < y_end && j < width; j++) {
-      atomicAdd(&sh_histt[256], sw);
-      atomicAdd(&sh_histt[img[j * steps + i * channels_c + channel]], sw);
-    }
-
-  __syncthreads();
-  if (index == 0) {
-    atomicAdd(&count[0], sh_histt[256]);
-  }
-
-  if (index < 256) {
-    atomicAdd(&histt[index], sh_histt[index]);
-  }
-}
 __device__ void
 helper_extract_histogram(const uchar* img,
                          int* count,
@@ -146,6 +49,7 @@ helper_extract_histogram(const uchar* img,
       atomicAdd(&histt[i], sh_histt[i]);
     }
 }
+
 __device__ void
 helper_extract_histogram_rgb(const uchar* img,
                              int* count,
@@ -197,6 +101,7 @@ helper_extract_histogram_rgb(const uchar* img,
       atomicAdd(&histt[i], sh_histt[i]);
     }
 }
+
 __device__ void
 helper_calculate_probability(int* hist, int total_pixels, double* prob)
 {
@@ -209,6 +114,7 @@ helper_calculate_probability(int* hist, int total_pixels, double* prob)
     prob[index] = (double)hist[index] / total_pixels;
   }
 }
+
 __device__ void
 helper_buildLook_up_table(double* prob, double* lut)
 {
@@ -231,6 +137,7 @@ helper_buildLook_up_table(double* prob, double* lut)
     lut[index] = sh_lut[index];
   }
 }
+
 __global__ void
 buildLook_up_table_rgb(int* hist_blue,
                        int* hist_green,
@@ -248,16 +155,11 @@ buildLook_up_table_rgb(int* hist_blue,
     double* prob_blue = new double[256];
     double* prob_red = new double[256];
     double* prob_green = new double[256];
-    // printf("%d %d %d\n", hist_blue[45], hist_green[45], hist_red[45]);
 
     calculate_probability<<<1, 256>>>(hist_blue, count, prob_blue);
     calculate_probability<<<1, 256>>>(hist_green, count, prob_green);
     calculate_probability<<<1, 256>>>(hist_red, count, prob_red);
-    // printf("%d %d %d\n", hist_blue[45], hist_green[45], hist_red[45]);
     cudaDeviceSynchronize();
-
-    // printf("%d %d %d %d %d %d\n", prob_blue[45], prob_green[45], prob_red[45,
-    // hist_blue[45], hist_green[45], hist_red[45]]);
 
     buildLook_up_table<<<1, 256>>>(prob_blue, lut_blue);
     buildLook_up_table<<<1, 256>>>(prob_green, lut_green);
@@ -392,9 +294,7 @@ apply_LHE_helper(uchar* base,
 
         for (auto k = 0; k < channels_c; k++) {
           base[j * steps + i * channels_c + k] =
-            img[j * steps + i * channels_c + k];
-          // base.at<cv::Vec3b>(i, j)[k] =
-          // (uchar)lut[img.at<cv::Vec3b>(i, j)[k]];
+            (uchar)floor(lut[3][img[j * steps + i * channels_c + k]]);
         }
       }
     } else {
@@ -512,10 +412,7 @@ apply_LHE_helper(uchar* base,
 
         for (auto k = 0; k < channels_c; k++) {
           base[j * steps + i * channels_c + k] =
-            img[j * steps + i * channels_c + k];
-          //     // base[j * steps + i * k] = img[j * steps + i * k];
-          //     // base.at<cv::Vec3b>(i, j)[k] =
-          //     // (uchar)lut[img.at<cv::Vec3b>(i, j)[k]];
+            (uchar)floor(lut[3][img[j * steps + i * channels_c + k]]);
         }
       }
     }
@@ -552,20 +449,16 @@ apply_LHE(uchar* base,
   temp = new int[1];
   *count = 0;
   *temp = 0;
-  if (channels_c > 1) {
-    hists = new int*[channels_c];
-    for (auto i = 0; i < channels_c; i++) {
-      hists[i] = new int[PIXEL_RANGE]();
-      memset(hists[i], 0, PIXEL_RANGE * sizeof(int));
-    }
-  } else {
-    hist = new int[PIXEL_RANGE]();
+  hists = new int*[channels_c];
+  for (auto i = 0; i < channels_c; i++) {
+    hists[i] = new int[PIXEL_RANGE]();
+    memset(hists[i], 0, PIXEL_RANGE * sizeof(int));
   }
 
   if (thread_id == (total_threads - 1)) {
     i_end = width;
   }
-  // printf("pointer address to hists is %p\n", hists);
+
   __syncthreads();
   apply_LHE_helper(base,
                    img,
@@ -584,15 +477,10 @@ apply_LHE(uchar* base,
                    channels_c);
   __syncthreads();
 
-//   if (channels_c > 1) {
-//     // delete channels
-    for (auto k = 0; k < channels_c; k++) {
-      delete[] hists[k];
-    }
-    delete[] hists;
-//   } else {
-//     delete[] hist;
-//   }
+  for (auto k = 0; k < channels_c; k++) {
+    delete[] hists[k];
+  }
+  delete[] hists;
 }
 
 __global__ void
@@ -648,8 +536,6 @@ extract_histogram_rgb(const uchar* img,
   int x_end_ = (x + 1) * step_x;
   int y_end_ = (y + 1) * step_y;
 
-  // printf("x_start_ %d x_end_ %d y_start_ %d y_end_ %d\n", x_start_, x_end_,
-  // y_start_, y_end_);
   helper_extract_histogram_rgb(img,
                                count,
                                x_start_,
@@ -799,9 +685,7 @@ lhe_build_luts(double*** all_luts,
                                                hists[k],
                                                1);
       }
-      // print one of the hists
       cudaDeviceSynchronize();
-      // printf("%d %d %d \n", hists[0][45], hists[1][32], hists[2][12]);
       buildLook_up_table_rgb<<<1, 256>>>(hists[2],
                                          hists[1],
                                          hists[0],
@@ -811,11 +695,8 @@ lhe_build_luts(double*** all_luts,
                                          lut_blue,
                                          lut_green,
                                          lut_red);
-      //   for (auto a = 0; a < PIXEL_RANGE; a++) {
-      //     printf("%f ", all_luts[i / offset][j / offset][a]);
-      //     }
+
       cudaDeviceSynchronize();
-      //   printf("%d \n", all_luts[i / offset][j / offset][45]);
     }
   }
 
@@ -849,9 +730,6 @@ apply_interpolating_lhe(uchar* base,
   if (i >= height || j >= width) {
     return;
   }
-  //   if (x1 > height || y1 > width || x2 > height || y2 > width) {
-  //     return;
-  //   }
 
   double x1_weight = (double)(i - x1) / (double)(x2 - x1);
   double y1_weight = (double)(j - y1) / (double)(y2 - y1);
@@ -874,11 +752,6 @@ apply_interpolating_lhe(uchar* base,
               upper_right_lut[temp_pixel] * x2_weight * y1_weight +
               lower_left_lut[temp_pixel] * x1_weight * y2_weight +
               lower_right_lut[temp_pixel] * x1_weight * y1_weight));
-    // printf("%d\n", new_value);
     base[j * steps + i * channel_n + k] = new_value;
-    //   (uchar)(upper_left_lut[temp_pixel] * x2_weight * y2_weight +
-    //           upper_right_lut[temp_pixel] * x2_weight * y1_weight +
-    //           lower_left_lut[temp_pixel] * x1_weight * y2_weight +
-    //           lower_right_lut[temp_pixel] * x1_weight * y1_weight);
   }
 }
