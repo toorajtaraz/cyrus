@@ -116,3 +116,56 @@ lhe_api(cv::Mat src, int window, long long* taken_time)
   d_result.release();
   return h_result;
 }
+
+void
+handle_video(std::string input_path,
+             std::string output_path,
+             int window,
+             long long* taken_time_pure,
+             long long* taken_time_total)
+{
+  long long local_taken_time_pure = 0;
+  long long local_taken_time_total = 0;
+  try {
+    cv::VideoCapture cap(input_path);
+
+    if (!cap.isOpened()) {
+      std::cout << "Error: "
+                << "Can not open Video file at " << input_path << std::endl;
+    }
+    int frame_count = cap.get(cv::CAP_PROP_FRAME_COUNT);
+    cv::VideoWriter writer(output_path,
+                           cv::VideoWriter::fourcc('M', 'J', 'P', 'G'),
+                           cap.get(cv::CAP_PROP_FPS),
+                           cv::Size(cap.get(cv::CAP_PROP_FRAME_WIDTH),
+                                    cap.get(cv::CAP_PROP_FRAME_HEIGHT)));
+
+    for (int frame_num = 0; frame_num < frame_count; frame_num++) {
+      cv::Mat img;
+
+      cap >> img;
+      cv::Mat base;
+      // Window should not be bigger than the image
+      if (window > img.cols || window > img.rows) {
+        fprintf(stderr,
+                "Error: Window size should not be bigger than the image\n");
+        exit(1);
+      }
+      base = interpolating_lhe_api(
+        img, window, &local_taken_time_pure, &local_taken_time_total);
+
+      *taken_time_pure += local_taken_time_pure;
+      *taken_time_total += local_taken_time_total;
+
+      local_taken_time_pure = 0;
+      local_taken_time_total = 0;
+      writer << base;
+    }
+
+    writer.release();
+  } catch (cv::Exception& e) {
+    std::cout << "error message exception: " << e.msg << std::endl;
+    exit(1);
+  }
+//   clean_up();
+}

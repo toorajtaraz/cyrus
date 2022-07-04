@@ -31,5 +31,11 @@ interpolating_lhe_api(cv::Mat src,
                       long long* taken_time_total);
 void
 clean_up();
+void
+handle_video(std::string input_path,
+             std::string output_path,
+             int window,
+             long long* taken_time_pure,
+             long long* taken_time_total);
 // end def gaurds
 #endif // HELPERS_HPP
