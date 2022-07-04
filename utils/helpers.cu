@@ -68,24 +68,23 @@ helper_calculate_probability(int* hist, int total_pixels, double* prob)
 __device__ void
 helper_buildLook_up_table(double* prob, double* lut)
 {
-  // shared lut
-  __shared__ double sh_lut[256];
+  // shared prob
+  __shared__ double sh_prob[256];
 
   int index = blockDim.x * blockIdx.x + threadIdx.x;
   if (index < 256) {
-    sh_lut[index] = 0.0;
+    sh_prob[index] = prob[index];
   }
 
   __syncthreads();
-  if (index < 256)
-    for (auto j = 0; j <= index; j++) {
-      sh_lut[index] += prob[j] * MAX_PIXEL_VAL;
-    }
-  __syncthreads();
-
+  double temp_buffer = 0.0;
   if (index < 256) {
-    lut[index] = sh_lut[index];
-  }
+    for (auto j = 0; j <= index; j++) {
+      temp_buffer += sh_prob[j] * MAX_PIXEL_VAL;
+    }
+
+    lut[index] = temp_buffer;
+    }
 }
 
 __global__ void

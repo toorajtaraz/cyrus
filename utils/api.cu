@@ -55,7 +55,7 @@ interpolating_lhe_api(cv::Mat src,
     }
   }
   dim3 dimBlock(32, 32, 1);
-  dim3 dimGrid((d_src.cols * 2) / 32 + 2, (d_src.rows * 2) / 32, 1);
+  dim3 dimGrid((d_src.cols) / 32 + 1, (d_src.rows) / 32 + 1, 1);
   auto start_gpu = std::chrono::high_resolution_clock::now();
 
   lhe_build_luts<<<1, 4>>>(

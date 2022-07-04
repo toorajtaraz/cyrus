@@ -26,16 +26,18 @@ main(int argc, char** argv)
   long long time_pure;
   long long time_total;
 
-  //create resized versions of src by 0.1, 0.3, 0.5, 0.7
+  //create resized versions of src by 0.1, 0.3, 0.5, 0.7, 0.9
   cv::Mat src_0_1;
   cv::Mat src_0_3;
   cv::Mat src_0_5;
   cv::Mat src_0_7;
+  cv::Mat src_0_9;
 
   cv::resize(src, src_0_1, cv::Size(), 0.1, 0.1);
   cv::resize(src, src_0_3, cv::Size(), 0.3, 0.3);
   cv::resize(src, src_0_5, cv::Size(), 0.5, 0.5);
   cv::resize(src, src_0_7, cv::Size(), 0.7, 0.7);
+  cv::resize(src, src_0_9, cv::Size(), 0.9, 0.9);
   
 
   //call interpolating_lhe_api on original image and resized ones
@@ -61,6 +63,10 @@ main(int argc, char** argv)
   cout << time_pure << " " << src_0_7.cols << " " << src_0_7.rows << endl;
   cv::imshow("src_0_7", src_0_7);
   cv::imshow("dst_0_7", dst_0_7);
+  cv::Mat dst_0_9 = interpolating_lhe_api(src_0_9, 151, &time_pure, &time_total);
+  cout << time_pure << " " << src_0_9.cols << " " << src_0_9.rows << endl;
+  cv::imshow("src_0_9", src_0_9);
+  cv::imshow("dst_0_9", dst_0_9);
   cv::waitKey(0);
   // std::cout << "time pure: " << time_pure << endl;
   // std::cout << "time total: " << time_total << endl;
