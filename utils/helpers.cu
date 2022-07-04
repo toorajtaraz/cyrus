@@ -1,56 +1,6 @@
 #include <helpers.h>
 
 __device__ void
-helper_extract_histogram(const uchar* img,
-                         int* count,
-                         int x_start,
-                         int x_end,
-                         int y_start,
-                         int y_end,
-                         int width,
-                         int height,
-                         int steps,
-                         int* histt,
-                         int sw)
-{
-  __shared__ int sh_histt[257];
-
-  int index = threadIdx.y * blockDim.y + threadIdx.x;
-  // devid 256 by total number of threads in 2d block
-  int s = 256 / (blockDim.x * blockDim.y);
-
-  if (index == 0) {
-    sh_histt[256] = 0;
-  }
-
-  if (s < 1)
-    s = 1;
-
-  for (int i = index * s; i < ((index + 1) * s); i++)
-    if (i < 256) {
-      sh_histt[i] = 0;
-    }
-
-  __syncthreads();
-
-  if (x_start < height && y_start < width && x_start >= 0 && y_start >= 0) {
-
-    atomicAdd(&sh_histt[256], sw);
-    atomicAdd(&sh_histt[img[y_start * steps + x_start]], sw);
-  }
-
-  __syncthreads();
-  if (index == 0) {
-    atomicAdd(&count[0], sh_histt[256]);
-  }
-
-  for (int i = index * s; i < ((index + 1) * s); i++)
-    if (index < 256) {
-      atomicAdd(&histt[i], sh_histt[i]);
-    }
-}
-
-__device__ void
 helper_extract_histogram_rgb(const uchar* img,
                              int* count,
                              int x_start,
@@ -244,53 +194,6 @@ extract_histogram_rgb(const uchar* img,
                                histt,
                                sw);
 }
-
-__global__ void
-extract_histogram(const uchar* img,
-                  int* count,
-                  int x_start,
-                  int x_end,
-                  int y_start,
-                  int y_end,
-                  int width,
-                  int height,
-                  int steps,
-                  int* histt,
-                  int sww)
-{
-  int x_range = x_end - x_start;
-  int y_range = y_end - y_start;
-
-  int x = blockIdx.x * blockDim.x + threadIdx.x;
-  int y = blockIdx.y * blockDim.y + threadIdx.y;
-
-  int x_coverage = gridDim.x * blockDim.x;
-  int y_coverage = gridDim.y * blockDim.y;
-
-  int step_x = x_range / x_coverage;
-  int step_y = y_range / y_coverage;
-
-  if (step_x < 1) {
-    step_x = 1;
-  }
-
-  if (step_y < 1) {
-    step_y = 1;
-  }
-
-  helper_extract_histogram(img,
-                           count,
-                           x * step_x,
-                           (x + 1) * step_x,
-                           y * step_y,
-                           (y + 1) * step_y,
-                           width,
-                           height,
-                           steps,
-                           histt,
-                           sww);
-}
-
 __global__ void
 calculate_probability(int* hist, int total_pixels, double* prob)
 {
@@ -302,4 +205,3 @@ buildLook_up_table(double* prob, double* lut)
 {
   helper_buildLook_up_table(prob, lut);
 }
-

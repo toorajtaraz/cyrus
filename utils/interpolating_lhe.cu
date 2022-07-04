@@ -1,7 +1,6 @@
 #include <helpers.h>
 #include <interpolating_lhe.h>
 
-
 __host__ double***
 calculate_luts_for_dynamic_programming(const uchar* img,
                                        int width,
@@ -49,7 +48,6 @@ calculate_luts_for_dynamic_programming(const uchar* img,
   dim3 grid((2 * offset - 1) / 32 + 1, (2 * offset - 1) / 32 + 1, 1);
 
   for (int i = 0; i < height; i += offset) {
-    // if (i % offset == 0) {
     for (int j = 0; j < width; j += offset) {
       ZERO_OUT_RGB(u_hist_red, u_hist_green, u_hist_blue);
       ZERO_OUT_COUNTS(u_count_red, u_count_green, u_count_blue);
@@ -125,7 +123,6 @@ calculate_luts_for_dynamic_programming(const uchar* img,
       cudaDeviceSynchronize();
       VALIDATE_KERNEL_CALL();
     }
-    // }
   }
 
   cudaFree(u_hist_red);
@@ -177,7 +174,7 @@ lhe_build_luts(double*** all_luts,
     i_start = i_start + offset - (i_start % offset);
   }
   for (int i = i_start; i <= i_end; i += offset) {
-    for (int j = 0; j < max_j; j += offset) {
+    for (int j = 0; j <= max_j; j += offset) {
       dim3 block(32, 32, 1);
       dim3 grid((2 * offset - 1) / 32 + 1, (2 * offset - 1) / 32 + 1, 1);
 

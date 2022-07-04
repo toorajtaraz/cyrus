@@ -35,18 +35,7 @@ helper_extract_histogram_rgb(const uchar* img,
                              short channels_c = 3,
                              int* histt = NULL,
                              int sw = 1);
-__device__ void
-helper_extract_histogram(const uchar* img,
-                         int* count,
-                         int x_start,
-                         int x_end,
-                         int y_start,
-                         int y_end,
-                         int width,
-                         int height,
-                         int steps,
-                         int* histt = NULL,
-                         int sw = 1);
+
 __device__ void
 helper_calculate_probability(int* hist, int total_pixels, double* prob);
 __device__ void
@@ -66,18 +55,7 @@ extract_histogram_rgb(const uchar* img,
                       short channels_c = 3,
                       int* histt = NULL,
                       int sw = 1);
-__global__ void
-extract_histogram(const uchar* img,
-                  int* count,
-                  int x_start,
-                  int x_end,
-                  int y_start,
-                  int y_end,
-                  int width,
-                  int height,
-                  int steps,
-                  int* histt = NULL,
-                  int sw = 1);
+
 __global__ void
 calculate_probability(int* hist, int total_pixels, double* prob);
 __global__ void
