@@ -21,12 +21,14 @@ set( NAME_SRC
   utils/helpers.cu
   utils/interpolating_lhe.cu 
   utils/lhe.cu
+  utils/api.cu
 )
 
 set( NAME_HEADERS
   headers/helpers.h
   headers/interpolating_lhe.h
   headers/lhe.h
+  headers/api.h
 )
 
 INCLUDE_DIRECTORIES( ${CMAKE_CURRENT_SOURCE_DIR}/headers )
